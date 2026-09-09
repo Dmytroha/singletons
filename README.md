@@ -1,5 +1,7 @@
 # singletons
 
+[![Java tests](https://github.com/Dmytroha/singletons/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Dmytroha/singletons/actions/workflows/tests.yml)
+
 Ленивые singleton на Java из обсуждения: три корректных варианта и один намеренно некорректный пример без `volatile`. Код сопровождается пояснениями на русском и многопоточными тестами без сторонних зависимостей.
 
 ## Варианты
