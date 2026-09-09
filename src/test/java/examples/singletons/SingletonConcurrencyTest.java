@@ -11,9 +11,9 @@ import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 /**
- * Многопоточная проверка без сторонних зависимостей.
- * Каждый запуск JVM проверяет конкурентный первый доступ к трём вариантам.
- * Это smoke/stress-тест, а не доказательство корректности по модели памяти.
+ * A multithreaded test with no third-party dependencies.
+ * Each JVM run tests concurrent first access to all three implementations.
+ * This is a smoke/stress test, not a proof of correctness under the memory model.
  */
 public final class SingletonConcurrencyTest {
 
@@ -37,7 +37,7 @@ public final class SingletonConcurrencyTest {
                 DoubleCheckedSingleton::getInstance,
                 DoubleCheckedSingleton::getValue);
 
-        System.out.println("PASS: все три корректных варианта.");
+        System.out.println("PASS: all three correct implementations.");
     }
 
     private static <T> void check(
@@ -55,29 +55,29 @@ public final class SingletonConcurrencyTest {
                 futures.add(pool.submit(() -> {
                     ready.countDown();
                     if (!start.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                        throw new AssertionError(name + ": таймаут старта");
+                        throw new AssertionError(name + ": start timed out");
                     }
 
                     T first = null;
                     for (int call = 0; call < CALLS_PER_THREAD; call++) {
                         T current = getInstance.get();
                         if (current == null) {
-                            throw new AssertionError(name + ": получен null");
+                            throw new AssertionError(name + ": received null");
                         }
 
-                        // Читаем поле прямо в рабочем потоке, до Future.get()
-                        // и других действий, передающих результат главному потоку.
+                        // Read the field in the worker thread, before Future.get()
+                        // or any other action that passes results to the main thread.
                         int value = getValue.applyAsInt(current);
                         if (value != 42) {
                             throw new AssertionError(
-                                    name + ": некорректное значение " + value);
+                                    name + ": unexpected value " + value);
                         }
 
                         if (first == null) {
                             first = current;
                         } else if (current != first) {
                             throw new AssertionError(
-                                    name + ": экземпляр сменился внутри потока");
+                                    name + ": instance changed within a thread");
                         }
                     }
                     return first;
@@ -85,7 +85,7 @@ public final class SingletonConcurrencyTest {
             }
 
             if (!ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                throw new AssertionError(name + ": потоки не готовы");
+                throw new AssertionError(name + ": threads are not ready");
             }
             start.countDown();
 
@@ -94,18 +94,18 @@ public final class SingletonConcurrencyTest {
                 T actual = future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 if (actual != expected) {
                     throw new AssertionError(
-                            name + ": разные потоки получили разные экземпляры");
+                            name + ": different threads received different instances");
                 }
             }
 
             System.out.printf(
-                    "PASS: %s; потоков=%d; вызовов=%d%n",
+                    "PASS: %s; threads=%d; calls=%d%n",
                     name, THREADS, THREADS * CALLS_PER_THREAD);
         } finally {
             start.countDown();
             pool.shutdownNow();
             if (!pool.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                throw new AssertionError(name + ": потоки не завершились");
+                throw new AssertionError(name + ": threads did not terminate");
             }
         }
     }

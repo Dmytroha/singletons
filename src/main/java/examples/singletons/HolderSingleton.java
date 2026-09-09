@@ -1,16 +1,16 @@
 package examples.singletons;
 
 /**
- * Ленивый singleton на основе инициализации вложенного класса.
+ * A lazy singleton based on nested class initialization.
  */
 public final class HolderSingleton {
 
-    // Намеренно не final для проверки безопасной публикации.
+    // Intentionally not final to test safe publication.
     private int value;
 
     private HolderSingleton() {
         value = 42;
-        // Не публиковать this и не вызывать getInstance() из конструктора.
+        // Do not publish this or call getInstance() from the constructor.
     }
 
     private static class Holder {

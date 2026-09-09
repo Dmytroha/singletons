@@ -1,6 +1,6 @@
-# Почему двойная проверка без volatile некорректна
+# Why double-checked locking without volatile is unsafe
 
-Речь идёт об учебном [`BrokenDoubleCheckedSingleton`](../src/main/java/examples/singletons/unsafe/BrokenDoubleCheckedSingleton.java). Его `instance` не имеет модификатора `volatile`, а `value` является обычным, не `final`, полем:
+This explanation uses the educational [`BrokenDoubleCheckedSingleton`](../src/main/java/examples/singletons/unsafe/BrokenDoubleCheckedSingleton.java) example. Its `instance` reference is not `volatile`, and `value` is an ordinary, non-`final` field:
 
 ```java
 private static BrokenDoubleCheckedSingleton instance;
@@ -11,36 +11,36 @@ private BrokenDoubleCheckedSingleton() {
 }
 ```
 
-## Возможный сценарий
+## A possible scenario
 
-Порядок действий внутри одного потока сам по себе не гарантирует, какие записи увидит другой поток без необходимого отношения happens-before ([Java Memory Model](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). Ниже описан допустимый результат наблюдений, а не обещание воспроизведения на каждом запуске или конкретный порядок машинных инструкций.
+The order of actions within one thread does not, by itself, guarantee which writes another thread observes without the required happens-before relationship ([Java Memory Model](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). The scenario below describes a permitted observation, not a guarantee of reproducing it on every run or a specific ordering of machine instructions.
 
-| Шаг | Поток A | Поток B |
+| Step | Thread A | Thread B |
 | --- | --- | --- |
-| 1 | Видит `null`, захватывает монитор, повторно проверяет `null`. | |
-| 2 | Создаёт объект с начальным `value == 0`. | |
-| 3 | Конструктор записывает `value = 42`. | |
-| 4 | Записывает ссылку в обычное поле `instance`. | |
-| 5 | | Читает ненулевую ссылку из `instance`. |
-| 6 | | Пропускает `synchronized` и возвращает объект. |
-| 7 | | Вызывает `getValue()` и может прочитать `0`, а не `42`. |
+| 1 | Sees `null`, acquires the monitor, and checks for `null` again. | |
+| 2 | Creates an object with the initial value `value == 0`. | |
+| 3 | The constructor writes `value = 42`. | |
+| 4 | Writes the reference to the ordinary `instance` field. | |
+| 5 | | Reads a non-null reference from `instance`. |
+| 6 | | Skips `synchronized` and returns the object. |
+| 7 | | Calls `getValue()` and may read `0` rather than `42`. |
 
-Без безопасной публикации видимость новой ссылки не означает видимость всех предшествующих записей в объект; чтение обычного поля не обязано увидеть запись конструктора при отсутствии нужного happens-before ([JLS, раздел 17.4.5](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)).
+Without safe publication, visibility of the new reference does not imply visibility of all preceding writes to the object; a read of an ordinary field is not required to observe the constructor's write without the necessary happens-before relationship ([JLS, Section 17.4.5](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)).
 
-## Почему synchronized не спасает быстрый путь
+## Why synchronized does not protect the fast path
 
-Освобождение монитора happens-before последующего захвата того же монитора ([JLS, глава 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). Но поток B в этом сценарии его не захватывает, поэтому эта гарантия к его быстрому пути не применяется.
+Releasing a monitor happens-before a subsequent acquisition of the same monitor ([JLS, Chapter 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). However, thread B does not acquire that monitor in this scenario, so the guarantee does not apply to its fast path.
 
-## Что исправляет volatile
+## What volatile fixes
 
-Нужное изменение находится в объявлении ссылки, а не в поле `value`:
+The necessary change is in the reference declaration, not in the `value` field:
 
 ```java
 private static volatile DoubleCheckedSingleton instance;
 ```
 
-Запись в `volatile` happens-before последующего чтения этого поля; вместе с порядком действий в каждом потоке получается транзитивная цепочка от записи `value = 42` до чтения `value` получателем ссылки ([JLS, глава 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). Если после конструктора поле никто не изменяет, получатель опубликованного экземпляра прочитает `42`.
+A write to a `volatile` field happens-before a subsequent read of that field; combined with program order in each thread, this creates a transitive chain from the write `value = 42` to the read of `value` by the thread receiving the reference ([JLS, Chapter 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). If the field is not modified after construction, the recipient of the published instance reads `42`.
 
-## Почему обычный тест может всегда проходить
+## Why an ordinary test may always pass
 
-Некорректность означает отсутствие требуемой гарантии, а не обязательное появление ошибки в каждом исполнении ([Java Memory Model](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). Поэтому успешный прогон антипримера не используется в этом проекте как доказательство его безопасности, а проверка не требует обязательно увидеть `0`.
+Being unsafe means lacking the required guarantee, not necessarily exhibiting a failure in every execution ([Java Memory Model](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). This project therefore does not treat a successful run of the unsafe example as proof of safety, and no test requires observing `0`.

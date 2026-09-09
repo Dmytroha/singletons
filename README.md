@@ -2,121 +2,121 @@
 
 [![Java tests](https://github.com/Dmytroha/singletons/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Dmytroha/singletons/actions/workflows/tests.yml)
 
-Ленивые singleton на Java из обсуждения: три корректных варианта и один намеренно некорректный пример без `volatile`. Код сопровождается пояснениями на русском и многопоточными тестами без сторонних зависимостей.
+Lazy singleton implementations in Java from our discussion: three correct variants and one intentionally unsafe example without `volatile`. The code includes English explanations and multithreaded tests with no third-party dependencies.
 
-## Варианты
+## Implementations
 
-| Класс | Создание и публикация | Статус |
+| Class | Construction and publication | Status |
 | --- | --- | --- |
-| [`BoundedCasSingleton`](src/main/java/examples/singletons/BoundedCasSingleton.java) | Максимум два успешно созданных кандидата; все вызовы возвращают победителя CAS | Корректный пример |
-| [`HolderSingleton`](src/main/java/examples/singletons/HolderSingleton.java) | Один экземпляр при инициализации вложенного класса | Корректный пример |
-| [`DoubleCheckedSingleton`](src/main/java/examples/singletons/DoubleCheckedSingleton.java) | Один экземпляр, двойная проверка и `volatile` | Корректный пример |
-| [`BrokenDoubleCheckedSingleton`](src/main/java/examples/singletons/unsafe/BrokenDoubleCheckedSingleton.java) | Двойная проверка без `volatile`; нет безопасной публикации для быстрого пути | **Антипример, не использовать** |
+| [`BoundedCasSingleton`](src/main/java/examples/singletons/BoundedCasSingleton.java) | At most two successfully constructed candidates; every call returns the CAS winner | Correct example |
+| [`HolderSingleton`](src/main/java/examples/singletons/HolderSingleton.java) | One instance created during nested class initialization | Correct example |
+| [`DoubleCheckedSingleton`](src/main/java/examples/singletons/DoubleCheckedSingleton.java) | One instance, double-checked locking, and `volatile` | Correct example |
+| [`BrokenDoubleCheckedSingleton`](src/main/java/examples/singletons/unsafe/BrokenDoubleCheckedSingleton.java) | Double-checked locking without `volatile`; no safe publication for the fast path | **Unsafe example, do not use** |
 
-Во всех примерах есть обычное, не `final`, поле `value`, которому конструктор присваивает `42`. Оно добавлено для демонстрации безопасной публикации; после конструктора код это поле не изменяет.
+Each example has an ordinary, non-`final` field named `value`, which the constructor sets to `42`. It demonstrates safe publication; the code does not modify the field after construction.
 
-## Сборка и запуск
+## Building and running
 
-Нужен JDK 17 или новее. Для `build.sh` также нужен Bash, например в Linux, macOS или WSL; Maven, Gradle и внешние библиотеки не требуются.
+JDK 17 or newer is required. The `build.sh` script also requires Bash, for example on Linux, macOS, or WSL; Maven, Gradle, and external libraries are not needed.
 
 ```bash
-# Компиляция и три независимых запуска тестов.
+# Compile and run the tests in three separate JVMs.
 ./build.sh
 
-# Десять независимых запусков тестов.
+# Run the tests in ten separate JVMs.
 ./build.sh 10
 
-# Простая демонстрация после сборки.
+# Run a simple demonstration after building.
 java -cp out/main examples.singletons.Demo
 ```
 
-Каждый запуск тестов создаёт новую JVM, чтобы снова проверить конкурентный первый доступ. Для каждого корректного варианта стартуют 64 потока, каждый выполняет 5 000 вызовов.
+Each test run starts a new JVM to exercise concurrent first access again. For each correct implementation, 64 threads are started, and each thread makes 5,000 calls.
 
-Тесты проверяют:
+The tests check:
 
-- **Единую ссылку:** все потоки получают один и тот же объект, а последующие вызовы не меняют его.
-- **Состояние:** каждый рабочий поток сразу после получения объекта читает `value == 42`.
-- **Завершение:** ожидания ограничены таймаутами, ошибки дают ненулевой код завершения.
+- **Reference identity:** every thread receives the same object, and subsequent calls keep returning it.
+- **State:** each worker thread reads `value == 42` immediately after obtaining the object.
+- **Termination:** waits have timeouts, and failures produce a nonzero exit code.
 
-Эти проверки не доказывают корректность по Java Memory Model и не гарантируют перебор всех возможных расписаний. Они также не считают внутренние вызовы конструктора и не гарантируют, что CAS-вариант в конкретном запуске действительно создаст второго кандидата; ограничение двух кандидатов следует из алгоритма.
+These tests do not prove correctness under the Java Memory Model or cover every possible thread schedule. They also do not count internal constructor calls or guarantee that the CAS implementation actually creates a second candidate in a particular run; the two-candidate bound follows from the algorithm.
 
-Некорректный вариант компилируется, но намеренно не участвует в положительных тестах и `Demo`. Отсутствие наблюдаемой ошибки у него не означает, что он стал безопасным.
+The unsafe example is compiled but deliberately excluded from the passing test suite and `Demo`. A run without an observed failure does not make it safe.
 
-## Автоматические тесты в GitHub Actions
+## Automated tests with GitHub Actions
 
-Workflow [`Java tests`](.github/workflows/tests.yml) запускается при каждом `push`, при открытии или обновлении pull request, а также вручную через вкладку Actions. Его конфигурация находится в `.github/workflows/tests.yml`.
+The [`Java tests`](.github/workflows/tests.yml) workflow runs on every `push`, when a pull request is opened or updated, and when started manually from the Actions tab. Its configuration is stored in `.github/workflows/tests.yml`.
 
-- **Версии Java:** 17, 21 и 25, дистрибутив Temurin, Linux.
-- **Проверки:** `./build.sh 10` компилирует проект и выполняет десять независимых запусков многопоточных тестов на каждой версии Java; затем запускается `Demo`.
-- **Права:** только `contents: read`, без дополнительных пользовательских секретов; checkout не сохраняет учётные данные для последующих Git-команд.
-- **Ограничения:** таймаут десять минут на задание, устаревший запуск той же ветки или pull request отменяется при новом запуске. Ошибка одной версии Java не отменяет проверки остальных версий.
-- **Зависимости CI:** `actions/checkout` и `actions/setup-java` закреплены за конкретными SHA коммитов.
+- **Java versions:** 17, 21, and 25, using the Temurin distribution on Linux.
+- **Checks:** `./build.sh 10` compiles the project and runs the multithreaded tests in ten separate JVMs for each Java version, followed by `Demo`.
+- **Permissions:** only `contents: read`, with no additional user-provided secrets; checkout does not retain credentials for subsequent Git commands.
+- **Limits:** each job has a ten-minute timeout, and a newer run cancels an outdated run for the same branch or pull request. A failure on one Java version does not cancel the checks for the other versions.
+- **CI dependencies:** `actions/checkout` and `actions/setup-java` are pinned to specific commit SHAs.
 
-Результат каждого запуска доступен во вкладке Actions репозитория. Антипример без `volatile` по-прежнему только компилируется и не включён в положительные проверки.
+The result of each run is available in the repository's Actions tab. The unsafe example without `volatile` is still only compiled and is not included in the passing test suite.
 
-## Защита ветки main
+## Main branch protection
 
-Ветка `main` защищена правилами GitHub. Успешный локальный запуск `./build.sh` полезен для проверки изменений, но не заменяет обязательные проверки GitHub Actions перед слиянием.
+The `main` branch is protected by GitHub rules. A successful local run of `./build.sh` is useful for checking changes, but does not replace the required GitHub Actions checks before merging.
 
-- **Обязательные проверки:** `Java 17`, `Java 21` и `Java 25`. Для каждого имени закреплён источник GitHub Actions, поэтому одноимённая проверка от другого приложения не заменяет требуемую.
-- **Актуальность ветки:** перед слиянием ветка pull request должна быть актуальна относительно `main`. Если в `main` появились новые коммиты, обновите свою ветку и дождитесь результатов проверок обновлённой версии.
-- **Администраторы:** ограничения распространяются и на администраторов репозитория; обход проверок для них не включён.
-- **Защита истории:** force push в `main` и удаление ветки `main` запрещены.
-- **Ревью:** обязательные одобрения ревью не настроены. Это не отменяет обязательных проверок тестов.
+- **Required checks:** `Java 17`, `Java 21`, and `Java 25`. Each name is tied to GitHub Actions as its source, so a check with the same name from another app does not satisfy the requirement.
+- **Up-to-date branch:** the pull request branch must be up to date with `main` before merging. If new commits have been added to `main`, update your branch and wait for the checks on the updated version.
+- **Administrators:** the restrictions also apply to repository administrators; bypassing the checks is not enabled for them.
+- **History protection:** force pushes to `main` and deletion of `main` are prohibited.
+- **Reviews:** mandatory review approvals are not configured. This does not remove the requirement for test checks.
 
-Рекомендуемый порядок внесения изменений:
+Recommended contribution workflow:
 
-1. Создайте отдельную ветку от актуальной `main` и внесите изменения.
-2. По возможности выполните `./build.sh` локально, затем отправьте ветку в GitHub и откройте pull request в `main`.
-3. При необходимости обновите ветку относительно `main` и дождитесь успешных проверок `Java 17`, `Java 21` и `Java 25`.
-4. Слейте pull request обычным способом, не отключая защиту ветки.
+1. Create a separate branch from the latest `main` and make your changes.
+2. Run `./build.sh` locally if possible, then push the branch to GitHub and open a pull request targeting `main`.
+3. Update your branch with changes from `main` if necessary, and wait for `Java 17`, `Java 21`, and `Java 25` to pass.
+4. Merge the pull request normally, without disabling branch protection.
 
-Включённые правила требуют проверок, но не устанавливают отдельный запрет на любые изменения вне pull request: работа через PR здесь является рекомендуемым процессом. Механизмы обязательных проверок и применения правил к администраторам описаны в [документации GitHub](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches).
+The enabled rules require checks, but do not impose a separate requirement that every change must go through a pull request: using PRs is the recommended process here. Required checks and enforcement for administrators are described in the [GitHub documentation](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches).
 
-## CAS с максимум двумя кандидатами
+## CAS with at most two candidates
 
-`AtomicReference.compareAndSet(null, candidate)` атомарно публикует кандидата только при текущем значении `null`, поэтому победитель один ([документация AtomicReference](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/AtomicReference.html)). В этом примере «первый» означает первый успешно опубликованный объект, а не тот, чей конструктор раньше начался или завершился.
+`AtomicReference.compareAndSet(null, candidate)` atomically publishes a candidate only if the current value is `null`, so there is a single winner ([AtomicReference documentation](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/AtomicReference.html)). In this example, "first" means the first successfully published object, not the one whose constructor started or finished first.
 
-`Semaphore(2)` ограничивает число потоков в участке создания двумя разрешениями ([документация Semaphore](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Semaphore.html)). В нашем алгоритме поток удерживает разрешение до публикации либо отказа от кандидата, а следующий получивший разрешение поток перечитывает `INSTANCE`; после публикации он уже не создаёт новый объект.
+`Semaphore(2)` uses two permits to limit the number of threads in the construction section ([Semaphore documentation](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Semaphore.html)). In this algorithm, a thread holds its permit until it publishes or discards its candidate; the next thread to acquire a permit re-reads `INSTANCE` and does not create another object once a winner has been published.
 
-При успешной инициализации может быть создан один объект или два, но возвращается только победитель. После инициализации быстрый путь не обращается к семафору; во время инициализации возможна блокировка, поэтому этот вариант не является полностью неблокирующим алгоритмом.
+Successful initialization may create one or two objects, but only the winner is returned. After initialization, the fast path does not use the semaphore; initialization itself may block, so this implementation is not a fully nonblocking algorithm.
 
-Проигравший кандидат вызывает `dispose()`, где нужно освобождать принадлежащие именно ему внешние ресурсы. В текущем примере таких ресурсов нет, поэтому метод пустой.
+The losing candidate's `dispose()` method is called to release external resources owned specifically by that candidate. This example has no such resources, so the method is empty.
 
-`dispose()` не удаляет объект из памяти: после исчезновения ссылок объект становится доступен для сборки мусора, без гарантии немедленного освобождения памяти ([документация GC](https://docs.oracle.com/en/java/javase/21/gctuning/other-considerations.html)). Вызывать `System.gc()` для этого не нужно.
+`dispose()` does not delete the object from memory: once no references keep it reachable, it becomes eligible for garbage collection, with no guarantee of immediate memory reclamation ([GC documentation](https://docs.oracle.com/en/java/javase/21/gctuning/other-considerations.html)). There is no need to call `System.gc()` for this.
 
 ## Holder
 
-Вложенный `Holder` инициализируется при первом обращении к его полю `INSTANCE`; JVM обеспечивает синхронизацию инициализации класса и необходимую видимость результатов ([JLS, глава 12](https://docs.oracle.com/javase/specs/jls/se22/html/jls-12.html)). Поэтому здесь не нужны собственные `synchronized`, `volatile` или CAS.
+The nested `Holder` class is initialized on the first access to its `INSTANCE` field; the JVM synchronizes class initialization and provides the required visibility guarantees ([JLS, Chapter 12](https://docs.oracle.com/javase/specs/jls/se22/html/jls-12.html)). No explicit `synchronized`, `volatile`, or CAS is needed here.
 
-Из показанных решений я бы выбрал этот для простого singleton без параметров инициализации. Он короче и не допускает лишних кандидатов.
+Of these implementations, I would choose this one for a simple singleton without initialization parameters. It is shorter and does not create extra candidates.
 
-## Двойная проверка с volatile
+## Double-checked locking with volatile
 
-Первая проверка позволяет после создания обходиться без входа в монитор. Вторая проверка выполняется уже внутри `synchronized`, после обязательного повторного чтения `instance`, поскольку другой поток мог успеть создать объект.
+The first check avoids acquiring the monitor after the instance has been created. The second check runs inside `synchronized`, after the required re-read of `instance`, because another thread may already have created the object.
 
-`volatile` у ссылки обеспечивает безопасную публикацию: запись в это поле happens-before последующего чтения того же поля, а транзитивность распространяет гарантию на предшествующие записи конструктора ([JLS, глава 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). Локальная переменная позволяет на быстром пути использовать одно чтение `volatile` для проверки и возврата.
+Making the reference `volatile` ensures safe publication: a write to the field happens-before a subsequent read of the same field, and transitivity extends this guarantee to preceding writes made by the constructor ([JLS, Chapter 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). The local variable allows the fast path to use a single `volatile` read for both the check and the return value.
 
 ```text
-Поток A                          Поток B
+Thread A                         Thread B
 
 value = 42
     |
-volatile-запись instance  ---->  volatile-чтение instance
-                                     |
-                                чтение value: 42
+volatile write to instance ---> volatile read of instance
+                                    |
+                               read value: 42
 ```
 
-## Почему без volatile неправильно
+## Why omitting volatile is unsafe
 
-Поток может увидеть ненулевую ссылку на быстром пути, пропустить монитор и не иметь happens-before с записями конструктора; в частности, для обычного поля допустимо наблюдение начального `0` вместо `42` ([JLS, глава 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). Подробный пошаговый сценарий приведён в [`docs/without-volatile.md`](docs/without-volatile.md).
+A thread may observe a non-null reference on the fast path, skip the monitor, and lack a happens-before relationship with the constructor's writes; in particular, it is permitted to observe the initial value `0` instead of `42` for an ordinary field ([JLS, Chapter 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)). A detailed step-by-step scenario is provided in [`docs/without-volatile.md`](docs/without-volatile.md).
 
-Не нужно трактовать это как обязательную буквальную перестановку инструкций «ссылка записана раньше конструктора». Достаточно отсутствия гарантии того, какие записи другого потока видит читатель, что и описывает модель памяти ([JLS, глава 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)).
+This does not necessarily mean that instructions are literally reordered so that "the reference is written before the constructor runs." The absence of a guarantee about which writes from another thread the reader observes is sufficient, as described by the memory model ([JLS, Chapter 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)).
 
-## Границы примеров
+## Scope and limitations
 
-- **Область гарантии:** обычные вызовы `getInstance()` для одной загруженной версии класса; защита от обхода приватного конструктора через reflection, `Unsafe` и другие специальные механизмы в задачу не входит.
-- **Инициализация:** конструкторы в примерах не выбрасывают исключения, не публикуют `this` и не вызывают `getInstance()` рекурсивно. При добавлении кода с ошибками потребуется отдельно определить стратегию восстановления.
-- **Сбои конструктора:** CAS и DCL могут повторять попытки после исключений; лимит CAS относится к успешно созданным кандидатам, а не к произвольному числу аварийных попыток. Ошибка инициализации `Holder` переводит класс в ошибочное состояние, и последующие обращения не повторяют обычную инициализацию ([JLS, глава 12](https://docs.oracle.com/javase/specs/jls/se22/html/jls-12.html)).
-- **Побочные эффекты:** для CAS создание второго кандидата должно быть допустимо, а его ресурсы должны быть независимо освобождаемыми. `dispose()` не должен выбрасывать исключения или затрагивать ресурсы победителя.
-- **Изменяемое состояние:** безопасная публикация не делает произвольные дальнейшие изменения полей автоматически потокобезопасными; для конфликтующих доступов нужны собственные гарантии синхронизации ([JLS, глава 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)).
+- **Guarantee scope:** ordinary calls to `getInstance()` for a single loaded version of the class; preventing access to the private constructor through reflection, `Unsafe`, or other special mechanisms is outside the scope of these examples.
+- **Initialization:** the example constructors do not throw exceptions, publish `this`, or call `getInstance()` recursively. If initialization code that can fail is added, a recovery strategy must be defined separately.
+- **Constructor failures:** CAS and DCL can retry after exceptions; the CAS limit applies to successfully constructed candidates, not to an arbitrary number of failed attempts. A failure during `Holder` initialization puts the class into an erroneous state, and subsequent accesses do not retry normal initialization ([JLS, Chapter 12](https://docs.oracle.com/javase/specs/jls/se22/html/jls-12.html)).
+- **Side effects:** for CAS, constructing a second candidate must be acceptable, and its resources must be independently releasable. `dispose()` must not throw exceptions or affect the winner's resources.
+- **Mutable state:** safe publication does not automatically make arbitrary later field updates thread-safe; conflicting accesses need their own synchronization guarantees ([JLS, Chapter 17](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html)).

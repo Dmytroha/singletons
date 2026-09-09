@@ -4,8 +4,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Допускает максимум два успешно созданных кандидата, но возвращает
- * только первый опубликованный через CAS экземпляр.
+ * Allows at most two successfully constructed candidates, but returns
+ * only the first instance successfully published through CAS.
  */
 public final class BoundedCasSingleton {
 
@@ -14,12 +14,12 @@ public final class BoundedCasSingleton {
 
     private static final Semaphore CREATION_SLOTS = new Semaphore(2);
 
-    // Намеренно не final: на этом поле можно проверять безопасную публикацию.
+    // Intentionally not final so this field can be used to test safe publication.
     private int value;
 
     private BoundedCasSingleton() {
         value = 42;
-        // Не публиковать this и не вызывать getInstance() из конструктора.
+        // Do not publish this or call getInstance() from the constructor.
     }
 
     public static BoundedCasSingleton getInstance() {
@@ -30,7 +30,7 @@ public final class BoundedCasSingleton {
 
         CREATION_SLOTS.acquireUninterruptibly();
         try {
-            // Пока поток ждал разрешение, победителя могли уже опубликовать.
+            // Another thread may have published the winner while we waited.
             current = INSTANCE.get();
             if (current != null) {
                 return current;
@@ -53,9 +53,9 @@ public final class BoundedCasSingleton {
     }
 
     private void dispose() {
-        // В примере внешних ресурсов нет, поэтому освобождать нечего.
-        // При их добавлении закрыть здесь ресурсы именно этого кандидата.
-        // Метод не должен выбрасывать исключения.
-        // Память объекта освобождает GC, а не этот метод.
+        // This example has no external resources, so there is nothing to release.
+        // If resources are added, close only this candidate's resources here.
+        // This method must not throw exceptions.
+        // The GC reclaims the object's memory, not this method.
     }
 }

@@ -1,18 +1,18 @@
 package examples.singletons;
 
 /**
- * Ленивый singleton с двойной проверкой и безопасной volatile-публикацией.
+ * A lazy singleton using double-checked locking and safe volatile publication.
  */
 public final class DoubleCheckedSingleton {
 
     private static volatile DoubleCheckedSingleton instance;
 
-    // Намеренно не final для проверки безопасной публикации.
+    // Intentionally not final to test safe publication.
     private int value;
 
     private DoubleCheckedSingleton() {
         value = 42;
-        // Не публиковать this и не вызывать getInstance() из конструктора.
+        // Do not publish this or call getInstance() from the constructor.
     }
 
     public static DoubleCheckedSingleton getInstance() {
@@ -20,7 +20,7 @@ public final class DoubleCheckedSingleton {
 
         if (local == null) {
             synchronized (DoubleCheckedSingleton.class) {
-                // Другой поток мог создать экземпляр, пока мы ждали монитор.
+                // Another thread may have created the instance while we waited.
                 local = instance;
                 if (local == null) {
                     local = new DoubleCheckedSingleton();

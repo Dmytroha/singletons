@@ -1,7 +1,7 @@
 package examples.singletons;
 
 /**
- * Запускает только три корректных варианта.
+ * Runs only the three correct implementations.
  */
 public final class Demo {
 
@@ -9,12 +9,12 @@ public final class Demo {
     }
 
     public static void main(String[] args) {
-        System.out.println("CAS, максимум два кандидата: "
+        System.out.println("CAS, at most two candidates: "
                 + BoundedCasSingleton.getInstance().getValue());
-        System.out.println("Holder, один экземпляр: "
+        System.out.println("Holder, one instance: "
                 + HolderSingleton.getInstance().getValue());
-        System.out.println("Двойная проверка с volatile: "
+        System.out.println("Double-checked locking with volatile: "
                 + DoubleCheckedSingleton.getInstance().getValue());
-        System.out.println("Антипример без volatile не используется.");
+        System.out.println("The unsafe example without volatile is not used.");
     }
 }
