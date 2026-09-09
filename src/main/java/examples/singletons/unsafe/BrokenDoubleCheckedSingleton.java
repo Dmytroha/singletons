@@ -1,15 +1,15 @@
 package examples.singletons.unsafe;
 
 /**
- * УЧЕБНЫЙ АНТИПРИМЕР. НЕКОРРЕКТЕН В МНОГОПОТОЧНОЙ ПРОГРАММЕ.
+ * EDUCATIONAL ANTI-PATTERN. UNSAFE IN A MULTITHREADED PROGRAM.
  *
- * У ссылки намеренно отсутствует volatile, а value намеренно не final.
- * Поток на быстром пути может получить ссылку, но прочитать value == 0.
- * Отсутствие ошибки в конкретном запуске не доказывает корректность.
+ * The reference is intentionally not volatile, and value is not final.
+ * A thread taking the fast path may obtain the reference but read value == 0.
+ * A run without a failure does not prove correctness.
  */
 public final class BrokenDoubleCheckedSingleton {
 
-    private static BrokenDoubleCheckedSingleton instance; // ОШИБКА: нет volatile
+    private static BrokenDoubleCheckedSingleton instance; // BUG: missing volatile
 
     private int value;
 
@@ -25,7 +25,7 @@ public final class BrokenDoubleCheckedSingleton {
                 local = instance;
                 if (local == null) {
                     local = new BrokenDoubleCheckedSingleton();
-                    instance = local; // Нет безопасной публикации для быстрого пути
+                    instance = local; // No safe publication for the fast path
                 }
             }
         }
